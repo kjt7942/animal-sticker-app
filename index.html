@@ -212,6 +212,7 @@ async function cutout(file) {
   try {
     return await removeBg(file); // 전용 매팅 모델이 PNG(투명 배경) Blob을 바로 반환
   } catch (e) {
+    console.error('배경 제거 실패:', e);
     return null; // 실패 시 원본 사진 그대로 사용
   }
 }
