@@ -248,9 +248,9 @@ async function featherAlpha(blob, px = 4) {
 async function addStickerBorder(blob, steps = 32) {
   const bmp = await createImageBitmap(blob);
   const { width: w, height: h } = bmp;
-  const borderPx = Math.max(6, Math.round(Math.max(w, h) * 0.025));
+  const borderPx = Math.max(8, Math.round(Math.max(w, h) * 0.04));
 
-  // 실루엣(불투명 흰색 도장) 만들기
+  // 실루엣(불투명 흰색 도장) 만들기 - 알파를 이진화해서 흐릿한 그라데이션 없이 딱 떨어지게
   const sil = document.createElement('canvas');
   sil.width = w; sil.height = h;
   const silCtx = sil.getContext('2d');
@@ -258,6 +258,11 @@ async function addStickerBorder(blob, steps = 32) {
   silCtx.globalCompositeOperation = 'source-in';
   silCtx.fillStyle = '#fff';
   silCtx.fillRect(0, 0, w, h);
+  const silData = silCtx.getImageData(0, 0, w, h);
+  for (let i = 3; i < silData.data.length; i += 4) {
+    silData.data[i] = silData.data[i] > 40 ? 255 : 0;
+  }
+  silCtx.putImageData(silData, 0, 0);
 
   // 실루엣을 원 둘레 방향으로 여러 번 겹쳐 그려 테두리(팽창) 효과를 만든다
   const pad = borderPx + 2;
