@@ -209,19 +209,41 @@ Promise.all([
 async function cutout(imgEl) {
   const seg = await segModel.segment(imgEl);
   const { width, height, segmentationMap } = seg;
+  const n = width * height;
+  let mask = new Uint8Array(n);
+  let foregroundPixels = 0;
+  for (let i = 0; i < n; i++) {
+    const isBackground = segmentationMap[i * 4] === 0 && segmentationMap[i * 4 + 1] === 0 && segmentationMap[i * 4 + 2] === 0;
+    mask[i] = isBackground ? 0 : 1;
+    if (!isBackground) foregroundPixels++;
+  }
+  if (foregroundPixels === 0) return null; // 인식된 전경이 없으면 컷아웃 포기
+
+  // 경계가 거친 모델이라 다리/귀 같은 얇은 부위가 배경으로 잘못 잘림 → 전경을 살짝 팽창시켜 보정
+  for (let pass = 0; pass < 3; pass++) {
+    const next = mask.slice();
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = y * width + x;
+        if (mask[idx]) continue;
+        if ((x > 0 && mask[idx - 1]) || (x < width - 1 && mask[idx + 1]) ||
+            (y > 0 && mask[idx - width]) || (y < height - 1 && mask[idx + width])) {
+          next[idx] = 1;
+        }
+      }
+    }
+    mask = next;
+  }
+
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(imgEl, 0, 0, width, height);
   const imageData = ctx.getImageData(0, 0, width, height);
-  let foregroundPixels = 0;
-  for (let i = 0; i < width * height; i++) {
-    const isBackground = segmentationMap[i * 4] === 0 && segmentationMap[i * 4 + 1] === 0 && segmentationMap[i * 4 + 2] === 0;
-    if (isBackground) imageData.data[i * 4 + 3] = 0;
-    else foregroundPixels++;
+  for (let i = 0; i < n; i++) {
+    if (!mask[i]) imageData.data[i * 4 + 3] = 0;
   }
-  if (foregroundPixels === 0) return null; // 인식된 전경이 없으면 컷아웃 포기
   ctx.putImageData(imageData, 0, 0);
   return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
 }
