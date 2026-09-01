@@ -103,6 +103,13 @@
   }
   #saveBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #5aab77; }
 
+  #convertBtn {
+    display: block; margin: 10px auto 0; background: linear-gradient(180deg, #ffb3c6, #ff7fa6);
+    color: white; font-family: 'Jua', sans-serif; font-size: 15px; padding: 10px 24px;
+    border: none; border-radius: 999px; box-shadow: 0 4px 0 #e1517e; cursor: pointer;
+  }
+  #convertBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #e1517e; }
+
   #toggleOriginal {
     display: block; margin: 8px auto 10px; background: #eef3ff; color: #5b74c9;
     border: none; border-radius: 999px; padding: 6px 14px; font-family: 'Gaegu', sans-serif;
@@ -146,6 +153,7 @@
   <div id="result"></div>
   <div id="confirmArea">
     <div id="altChips"></div>
+    <button id="convertBtn" type="button" hidden>🎨 스티커로 변환</button>
     <button id="toggleOriginal" type="button" hidden>🖼️ 원본 사진으로 저장</button>
     <input id="nameInput" type="text" placeholder="이름 확인/수정">
     <button id="saveBtn">📌 도감에 추가</button>
@@ -209,6 +217,7 @@ const status = document.getElementById('status');
 const preview = document.getElementById('preview');
 const result = document.getElementById('result');
 const toggleOriginal = document.getElementById('toggleOriginal');
+const convertBtn = document.getElementById('convertBtn');
 const book = document.getElementById('book');
 const countEl = document.getElementById('count');
 const confirmArea = document.getElementById('confirmArea');
@@ -337,6 +346,7 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
   toggleOriginal.hidden = true;
   toggleOriginal.classList.remove('active');
   toggleOriginal.textContent = '🖼️ 원본 사진으로 저장';
+  convertBtn.hidden = true;
   const url = URL.createObjectURL(file);
   preview.src = url;
   preview.style.display = 'block';
@@ -357,17 +367,27 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
     ).join('');
     nameInput.value = koName;
     confirmArea.style.display = 'block';
-
-    status.textContent = '✂️ 배경 제거 중...';
-    const cutoutBlob = await cutout(file);
-    if (cutoutBlob) {
-      stickerBlob = cutoutBlob;
-      pendingBlob = cutoutBlob;
-      preview.src = URL.createObjectURL(cutoutBlob);
-      toggleOriginal.hidden = false;
-    }
-    status.textContent = '✨ 준비 완료! 사진을 찍어보세요';
+    convertBtn.hidden = false;
   };
+});
+
+convertBtn.addEventListener('click', async () => {
+  const file = originalBlob;
+  if (!file) return;
+  convertBtn.disabled = true;
+  status.textContent = '✂️ 배경 제거 중...';
+  const cutoutBlob = await cutout(file);
+  status.textContent = '✨ 준비 완료! 사진을 찍어보세요';
+  convertBtn.disabled = false;
+  if (cutoutBlob) {
+    stickerBlob = cutoutBlob;
+    pendingBlob = cutoutBlob;
+    preview.src = URL.createObjectURL(cutoutBlob);
+    convertBtn.hidden = true;
+    toggleOriginal.hidden = false;
+  } else {
+    status.textContent = '배경 제거 실패, 원본을 사용해요';
+  }
 });
 
 toggleOriginal.addEventListener('click', () => {
