@@ -211,7 +211,8 @@ Promise.all([
 async function cutout(file) {
   try {
     const raw = await removeBg(file); // 전용 매팅 모델이 PNG(투명 배경) Blob을 바로 반환
-    return await featherAlpha(raw);
+    const feathered = await featherAlpha(raw);
+    return await addStickerBorder(feathered);
   } catch (e) {
     console.error('배경 제거 실패:', e);
     return null; // 실패 시 원본 사진 그대로 사용
@@ -241,6 +242,36 @@ async function featherAlpha(blob, px = 4) {
   }
   sctx.putImageData(sharpData, 0, 0);
   return new Promise(resolve => sharp.toBlob(resolve, 'image/png'));
+}
+
+// 실제 스티커처럼 실루엣을 따라 두꺼운 흰색 테두리를 두른다
+async function addStickerBorder(blob, steps = 32) {
+  const bmp = await createImageBitmap(blob);
+  const { width: w, height: h } = bmp;
+  const borderPx = Math.max(6, Math.round(Math.max(w, h) * 0.025));
+
+  // 실루엣(불투명 흰색 도장) 만들기
+  const sil = document.createElement('canvas');
+  sil.width = w; sil.height = h;
+  const silCtx = sil.getContext('2d');
+  silCtx.drawImage(bmp, 0, 0);
+  silCtx.globalCompositeOperation = 'source-in';
+  silCtx.fillStyle = '#fff';
+  silCtx.fillRect(0, 0, w, h);
+
+  // 실루엣을 원 둘레 방향으로 여러 번 겹쳐 그려 테두리(팽창) 효과를 만든다
+  const pad = borderPx + 2;
+  const out = document.createElement('canvas');
+  out.width = w + pad * 2;
+  out.height = h + pad * 2;
+  const outCtx = out.getContext('2d');
+  for (let i = 0; i < steps; i++) {
+    const angle = (i / steps) * Math.PI * 2;
+    outCtx.drawImage(sil, pad + Math.cos(angle) * borderPx, pad + Math.sin(angle) * borderPx);
+  }
+  outCtx.drawImage(bmp, pad, pad); // 원본을 맨 위에 그대로 올린다
+
+  return new Promise(resolve => out.toBlob(resolve, 'image/png'));
 }
 
 document.getElementById('fileInput').addEventListener('change', async (e) => {
