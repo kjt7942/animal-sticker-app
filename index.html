@@ -237,6 +237,7 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
   confirmArea.style.display = 'none';
 
   preview.onload = async () => {
+    preview.onload = null;
     const predictions = await model.classify(preview);
     const top = predictions[0];
     const koName = toKorean(top.className);
