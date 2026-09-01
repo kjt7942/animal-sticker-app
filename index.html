@@ -135,7 +135,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/deeplab@0.2.1/dist/deeplab.min.js"></script>
 <script>
 const KO_LABELS = {
   'tabby':'고양이','egyptian cat':'고양이','persian cat':'고양이','siamese cat':'고양이','tiger cat':'고양이',
@@ -176,7 +175,7 @@ function toKorean(className) {
   return className.split(',')[0];
 }
 
-let model, segModel, db, pendingBlob;
+let model, removeBg, db, pendingBlob;
 const status = document.getElementById('status');
 const preview = document.getElementById('preview');
 const result = document.getElementById('result');
@@ -197,55 +196,21 @@ dbReq.onsuccess = (e) => {
 
 Promise.all([
   mobilenet.load(),
-  deeplab.load({ base: 'pascal', quantizationBytes: 2 })
-]).then(([m, s]) => {
+  import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/dist/index.mjs')
+]).then(([m, bg]) => {
   model = m;
-  segModel = s;
+  removeBg = bg.removeBackground;
   status.textContent = '✨ 준비 완료! 사진을 찍어보세요';
 }).catch(e => {
   status.textContent = '모델 로딩 실패: ' + e.message;
 });
 
-async function cutout(imgEl) {
-  const seg = await segModel.segment(imgEl);
-  const { width, height, segmentationMap } = seg;
-  const n = width * height;
-  let mask = new Uint8Array(n);
-  let foregroundPixels = 0;
-  for (let i = 0; i < n; i++) {
-    const isBackground = segmentationMap[i * 4] === 0 && segmentationMap[i * 4 + 1] === 0 && segmentationMap[i * 4 + 2] === 0;
-    mask[i] = isBackground ? 0 : 1;
-    if (!isBackground) foregroundPixels++;
+async function cutout(file) {
+  try {
+    return await removeBg(file); // 전용 매팅 모델이 PNG(투명 배경) Blob을 바로 반환
+  } catch (e) {
+    return null; // 실패 시 원본 사진 그대로 사용
   }
-  if (foregroundPixels === 0) return null; // 인식된 전경이 없으면 컷아웃 포기
-
-  // 경계가 거친 모델이라 다리/귀 같은 얇은 부위가 배경으로 잘못 잘림 → 전경을 살짝 팽창시켜 보정
-  for (let pass = 0; pass < 3; pass++) {
-    const next = mask.slice();
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const idx = y * width + x;
-        if (mask[idx]) continue;
-        if ((x > 0 && mask[idx - 1]) || (x < width - 1 && mask[idx + 1]) ||
-            (y > 0 && mask[idx - width]) || (y < height - 1 && mask[idx + width])) {
-          next[idx] = 1;
-        }
-      }
-    }
-    mask = next;
-  }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(imgEl, 0, 0, width, height);
-  const imageData = ctx.getImageData(0, 0, width, height);
-  for (let i = 0; i < n; i++) {
-    if (!mask[i]) imageData.data[i * 4 + 3] = 0;
-  }
-  ctx.putImageData(imageData, 0, 0);
-  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
 }
 
 document.getElementById('fileInput').addEventListener('change', async (e) => {
@@ -274,13 +239,11 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
     confirmArea.style.display = 'block';
 
     status.textContent = '✂️ 배경 제거 중...';
-    try {
-      const cutoutBlob = await cutout(preview);
-      if (cutoutBlob) {
-        pendingBlob = cutoutBlob;
-        preview.src = URL.createObjectURL(cutoutBlob);
-      }
-    } catch (e) { /* 실패 시 원본 사진 그대로 사용 */ }
+    const cutoutBlob = await cutout(file);
+    if (cutoutBlob) {
+      pendingBlob = cutoutBlob;
+      preview.src = URL.createObjectURL(cutoutBlob);
+    }
     status.textContent = '✨ 준비 완료! 사진을 찍어보세요';
   };
 });
