@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>동물 스티커 도감</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Gaegu', sans-serif;
+    max-width: 420px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding: 16px;
+    background: linear-gradient(160deg, #ffe8f0 0%, #e5f0ff 50%, #fff6d9 100%);
+    color: #5b4636;
+  }
+  h1 {
+    font-family: 'Jua', sans-serif;
+    text-align: center;
+    font-size: 24px;
+    color: #ff6f91;
+    text-shadow: 1px 2px 0 #fff;
+    margin: 8px 0 2px;
+  }
+  .subtitle { text-align: center; color: #a08b7a; font-size: 14px; margin-bottom: 14px; }
+
+  .camera-card {
+    background: #fffdf8;
+    border: 3px dashed #ffc6d9;
+    border-radius: 24px;
+    padding: 18px;
+    text-align: center;
+    box-shadow: 0 6px 0 #ffd6e4;
+  }
+  #status { color: #ff8fab; font-size: 14px; font-family: 'Jua', sans-serif; margin-bottom: 10px; }
+
+  .shutter-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(180deg, #ffb3c6, #ff7fa6);
+    color: white;
+    font-family: 'Jua', sans-serif;
+    font-size: 17px;
+    padding: 14px 26px;
+    border-radius: 999px;
+    box-shadow: 0 5px 0 #e1517e;
+    cursor: pointer;
+    user-select: none;
+    transition: transform .08s;
+  }
+  .shutter-label:active { transform: translateY(4px); box-shadow: 0 1px 0 #e1517e; }
+  #fileInput { display: none; }
+
+  #preview { width: 100%; border-radius: 18px; display: none; margin-top: 14px; border: 4px solid #fff; box-shadow: 0 3px 10px rgba(0,0,0,.08); }
+
+  #result {
+    margin-top: 12px; font-size: 20px; min-height: 28px;
+    font-family: 'Jua', sans-serif; color: #6a4c93;
+  }
+  #result .pill {
+    display: inline-block; background: #fff2a8; color: #a67c00; border-radius: 999px;
+    padding: 2px 12px; font-size: 13px; margin-left: 6px; font-family: 'Gaegu', sans-serif;
+  }
+  #result.pop { animation: pop .35s ease; }
+  @keyframes pop { 0%{transform:scale(.7);opacity:0} 60%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+
+  #confirmArea { display: none; margin-top: 12px; }
+  #altChips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 10px; }
+  .chip {
+    background: #eef3ff; color: #5b74c9; border: none; border-radius: 999px;
+    padding: 6px 14px; font-family: 'Gaegu', sans-serif; font-size: 13px; cursor: pointer;
+  }
+  .chip.picked { background: #ffd7e6; color: #d1447a; }
+  #nameInput {
+    font-family: 'Jua', sans-serif; font-size: 16px; text-align: center; color: #6a4c93;
+    border: 2px solid #ffd6e4; border-radius: 999px; padding: 8px 16px; width: 70%;
+  }
+  #saveBtn {
+    display: block; margin: 12px auto 0; background: linear-gradient(180deg, #b7e4c7, #7fc99a);
+    color: white; font-family: 'Jua', sans-serif; font-size: 15px; padding: 10px 24px;
+    border: none; border-radius: 999px; box-shadow: 0 4px 0 #5aab77; cursor: pointer;
+  }
+  #saveBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #5aab77; }
+
+  .book-head { display: flex; align-items: baseline; justify-content: space-between; margin-top: 26px; }
+  h2 { font-family: 'Jua', sans-serif; color: #6a9c78; font-size: 19px; margin: 0; }
+  #count { font-size: 13px; color: #8fae95; }
+  #clearBtn {
+    background: none; border: none; color: #c9a0a0; font-family: 'Gaegu', sans-serif;
+    font-size: 13px; cursor: pointer; text-decoration: underline;
+  }
+
+  #book { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+  .card {
+    background: #fffdf8; border-radius: 16px; padding: 8px; text-align: center;
+    box-shadow: 0 3px 0 #e9e2d0; font-size: 12px; animation: pop .3s ease;
+    min-width: 0;
+  }
+  .card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; }
+  .card .name { margin-top: 4px; font-family: 'Jua', sans-serif; color: #6a4c93; }
+  .empty-slot {
+    aspect-ratio: 1; border: 2px dashed #dcd3c3; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    color: #cfc4ae; font-size: 22px;
+  }
+</style>
+</head>
+<body>
+<h1>🐾 동물 스티커 도감</h1>
+<p class="subtitle">사진을 찍어서 친구를 모아보세요!</p>
+
+<div class="camera-card">
+  <p id="status">모델 로딩 중...</p>
+  <label class="shutter-label" for="fileInput">📸 사진 찍기</label>
+  <input type="file" accept="image/*" capture="environment" id="fileInput">
+  <img id="preview">
+  <div id="result"></div>
+  <div id="confirmArea">
+    <div id="altChips"></div>
+    <input id="nameInput" type="text" placeholder="이름 확인/수정">
+    <button id="saveBtn">📌 도감에 추가</button>
+  </div>
+</div>
+
+<div class="book-head">
+  <h2>📖 도감</h2>
+  <span id="count"></span>
+</div>
+<div id="book"></div>
+<button id="clearBtn">도감 전체 비우기</button>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
+<script>
+const KO_LABELS = {
+  'tabby':'고양이','egyptian cat':'고양이','persian cat':'고양이','siamese cat':'고양이','tiger cat':'고양이',
+  'lynx':'스라소니','cougar':'퓨마','lion':'사자','tiger':'호랑이','leopard':'표범','snow leopard':'눈표범','jaguar':'재규어','cheetah':'치타',
+  'golden retriever':'골든 리트리버','labrador retriever':'래브라도 리트리버','german shepherd':'저먼 셰퍼드',
+  'standard poodle':'푸들','miniature poodle':'푸들','toy poodle':'푸들','beagle':'비글','french bulldog':'프렌치 불도그',
+  'chihuahua':'치와와','siberian husky':'시베리안 허스키','pug':'퍼그','dalmatian':'달마시안',
+  'pembroke':'웰시코기','cardigan':'웰시코기','shih-tzu':'시츄','pomeranian':'포메라니안',
+  'wood rabbit':'토끼','hare':'토끼','angora':'토끼','hamster':'햄스터','guinea pig':'기니피그','fox squirrel':'다람쥐','marmot':'마멋',
+  'african elephant':'코끼리','indian elephant':'코끼리','zebra':'얼룩말','sorrel':'말','ox':'소','water buffalo':'물소','bison':'들소',
+  'ram':'양','bighorn':'양','ibex':'염소','hog':'돼지','wild boar':'멧돼지','warthog':'혹멧돼지','hippopotamus':'하마',
+  'hen':'닭','cock':'닭','goose':'거위','black swan':'백조','peacock':'공작','african grey':'앵무새','macaw':'앵무새',
+  'sulphur-crested cockatoo':'앵무새','bald eagle':'독수리','vulture':'독수리','great grey owl':'부엉이','flamingo':'플라밍고',
+  'white stork':'황새','black stork':'황새','pelican':'펠리컨','king penguin':'펭귄','albatross':'알바트로스',
+  'jay':'어치','magpie':'까치','robin':'울새','hummingbird':'벌새',
+  'monarch':'나비','cabbage butterfly':'나비','sulphur butterfly':'나비','admiral':'나비','ringlet':'나비','lycaenid':'나비',
+  'ant':'개미','bee':'벌','grasshopper':'메뚜기','cricket':'귀뚜라미','cockroach':'바퀴벌레','mantis':'사마귀','dragonfly':'잠자리',
+  'ladybug':'무당벌레','rhinoceros beetle':'장수풍뎅이','dung beetle':'쇠똥구리',
+  'scorpion':'전갈','tarantula':'타란튤라','wolf spider':'거미','garden spider':'거미','black widow':'거미','tick':'진드기','centipede':'지네',
+  'snail':'달팽이','slug':'민달팽이','jellyfish':'해파리','starfish':'불가사리','sea urchin':'성게',
+  'bullfrog':'개구리','tree frog':'개구리','loggerhead':'거북','leatherback turtle':'거북','box turtle':'거북',
+  'common iguana':'이구아나','american chameleon':'카멜레온','komodo dragon':'코모도왕도마뱀','african crocodile':'악어','american alligator':'악어',
+  'boa constrictor':'뱀','rock python':'뱀','indian cobra':'코브라','sea snake':'바다뱀','diamondback':'방울뱀','sidewinder':'방울뱀',
+  'goldfish':'금붕어','great white shark':'상어','tiger shark':'상어','hammerhead':'상어','stingray':'가오리',
+  'ostrich':'타조','goldfinch':'되새','toucan':'큰부리새','drake':'오리',
+  'koala':'코알라','wombat':'웜뱃','sea lion':'바다사자','killer whale':'범고래','grey whale':'고래',
+  'sloth bear':'곰','american black bear':'곰','brown bear':'곰','ice bear':'북극곰','giant panda':'판다',
+  'gibbon':'긴팔원숭이','baboon':'개코원숭이','macaque':'마카크원숭이','proboscis monkey':'코주부원숭이','marmoset':'마모셋',
+  'capuchin':'카푸친원숭이','squirrel monkey':'다람쥐원숭이','orangutan':'오랑우탄','gorilla':'고릴라','chimpanzee':'침팬지',
+  'red fox':'여우','kit fox':'여우','arctic fox':'여우','grey fox':'여우','timber wolf':'늑대','white wolf':'늑대','coyote':'코요테','dingo':'딩고',
+  'hyena':'하이에나','raccoon':'너구리','badger':'오소리','skunk':'스컹크','otter':'수달','mink':'밍크','weasel':'족제비','mongoose':'몽구스',
+  'armadillo':'아르마딜로','three-toed sloth':'나무늘보','gazelle':'가젤','arabian camel':'낙타','llama':'라마',
+  'porcupine':'고슴도치'
+};
+function toKorean(className) {
+  const parts = className.split(',').map(s => s.trim().toLowerCase());
+  for (const p of parts) if (KO_LABELS[p]) return KO_LABELS[p];
+  return className.split(',')[0];
+}
+
+let model, db, pendingFile;
+const status = document.getElementById('status');
+const preview = document.getElementById('preview');
+const result = document.getElementById('result');
+const book = document.getElementById('book');
+const countEl = document.getElementById('count');
+const confirmArea = document.getElementById('confirmArea');
+const altChips = document.getElementById('altChips');
+const nameInput = document.getElementById('nameInput');
+
+const dbReq = indexedDB.open('animal-sticker-db', 1);
+dbReq.onupgradeneeded = (e) => {
+  e.target.result.createObjectStore('sightings', { keyPath: 'id', autoIncrement: true });
+};
+dbReq.onsuccess = (e) => {
+  db = e.target.result;
+  loadBook();
+};
+
+mobilenet.load().then(m => {
+  model = m;
+  status.textContent = '✨ 준비 완료! 사진을 찍어보세요';
+}).catch(e => {
+  status.textContent = '모델 로딩 실패: ' + e.message;
+});
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file || !model) return;
+  pendingFile = file;
+  const url = URL.createObjectURL(file);
+  preview.src = url;
+  preview.style.display = 'block';
+  result.textContent = '분석 중... 🔍';
+  confirmArea.style.display = 'none';
+
+  preview.onload = async () => {
+    const predictions = await model.classify(preview);
+    const top = predictions[0];
+    const koName = toKorean(top.className);
+    result.innerHTML = `🎉 ${koName}<span class="pill">${(top.probability * 100).toFixed(0)}%</span>`;
+    result.classList.remove('pop'); void result.offsetWidth; result.classList.add('pop');
+
+    const candidates = [...new Set(predictions.slice(0, 3).map(p => toKorean(p.className)))];
+    altChips.innerHTML = candidates.map((c, i) =>
+      `<button type="button" class="chip${i === 0 ? ' picked' : ''}" data-name="${c}">${c}</button>`
+    ).join('');
+    nameInput.value = koName;
+    confirmArea.style.display = 'block';
+  };
+});
+
+altChips.addEventListener('click', (e) => {
+  const btn = e.target.closest('.chip');
+  if (!btn) return;
+  nameInput.value = btn.dataset.name;
+  altChips.querySelectorAll('.chip').forEach(c => c.classList.remove('picked'));
+  btn.classList.add('picked');
+});
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  const name = nameInput.value.trim();
+  if (!name || !pendingFile) return;
+  const record = { name, blob: pendingFile, ts: Date.now() };
+  db.transaction('sightings', 'readwrite').objectStore('sightings').add(record);
+  addCard(URL.createObjectURL(pendingFile), name);
+  renderCount();
+  renderEmptySlots();
+  confirmArea.style.display = 'none';
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  if (!confirm('도감을 전부 비울까요?')) return;
+  db.transaction('sightings', 'readwrite').objectStore('sightings').clear().onsuccess = () => {
+    book.innerHTML = '';
+    renderCount();
+    renderEmptySlots();
+  };
+});
+
+function loadBook() {
+  const req = db.transaction('sightings', 'readonly').objectStore('sightings').getAll();
+  req.onsuccess = () => {
+    req.result.sort((a, b) => b.ts - a.ts).forEach(r => addCard(URL.createObjectURL(r.blob), r.name));
+    renderCount();
+    renderEmptySlots();
+  };
+}
+
+function addCard(url, name) {
+  document.querySelectorAll('.empty-slot').forEach(s => s.remove());
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `<img src="${url}"><div class="name">${name}</div>`;
+  book.prepend(card);
+}
+
+function renderCount() {
+  countEl.textContent = book.querySelectorAll('.card').length + '마리 수집';
+}
+
+function renderEmptySlots() {
+  const have = book.querySelectorAll('.card').length;
+  for (let i = have; i < 6; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'empty-slot';
+    slot.textContent = '?';
+    book.appendChild(slot);
+  }
+}
+</script>
+</body>
+</html>
