@@ -37,6 +37,15 @@
   }
   #status { color: #ff8fab; font-size: 14px; font-family: 'Jua', sans-serif; margin-bottom: 10px; }
 
+  #progressWrap {
+    width: 100%; height: 8px; background: #ffe3ec; border-radius: 999px;
+    overflow: hidden; margin: -4px 0 10px;
+  }
+  #progressBar {
+    height: 100%; width: 0%; background: linear-gradient(90deg, #ff9eb9, #ff6f91);
+    border-radius: 999px; transition: width .15s ease;
+  }
+
   .shutter-label {
     display: inline-flex;
     align-items: center;
@@ -122,6 +131,7 @@
 
 <div class="camera-card">
   <p id="status">모델 로딩 중...</p>
+  <div id="progressWrap" hidden><div id="progressBar"></div></div>
   <label class="shutter-label" for="fileInput">📸 사진 찍기</label>
   <input type="file" accept="image/*" capture="environment" id="fileInput">
   <img id="preview">
@@ -218,13 +228,27 @@ Promise.all([
 });
 
 async function cutout(file) {
+  const progressWrap = document.getElementById('progressWrap');
+  const progressBar = document.getElementById('progressBar');
+  const fileProgress = {};
+  progressBar.style.width = '0%';
+  progressWrap.hidden = false;
   try {
-    const raw = await removeBg(file); // 전용 매팅 모델이 PNG(투명 배경) Blob을 바로 반환
+    const raw = await removeBg(file, {
+      progress: (key, current, total) => {
+        fileProgress[key] = total ? current / total : 0;
+        const values = Object.values(fileProgress);
+        const pct = Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100);
+        progressBar.style.width = pct + '%';
+      }
+    }); // 전용 매팅 모델이 PNG(투명 배경) Blob을 바로 반환
     const feathered = await featherAlpha(raw);
     return await addStickerBorder(feathered);
   } catch (e) {
     console.error('배경 제거 실패:', e);
     return null; // 실패 시 원본 사진 그대로 사용
+  } finally {
+    progressWrap.hidden = true;
   }
 }
 
