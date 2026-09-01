@@ -86,6 +86,13 @@
   }
   #saveBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #5aab77; }
 
+  #toggleOriginal {
+    display: block; margin: 8px auto 10px; background: #eef3ff; color: #5b74c9;
+    border: none; border-radius: 999px; padding: 6px 14px; font-family: 'Gaegu', sans-serif;
+    font-size: 13px; cursor: pointer;
+  }
+  #toggleOriginal.active { background: #ffd7e6; color: #d1447a; }
+
   .book-head { display: flex; align-items: baseline; justify-content: space-between; margin-top: 26px; }
   h2 { font-family: 'Jua', sans-serif; color: #6a9c78; font-size: 19px; margin: 0; }
   #count { font-size: 13px; color: #8fae95; }
@@ -121,6 +128,7 @@
   <div id="result"></div>
   <div id="confirmArea">
     <div id="altChips"></div>
+    <button id="toggleOriginal" type="button" hidden>🖼️ 원본 사진으로 저장</button>
     <input id="nameInput" type="text" placeholder="이름 확인/수정">
     <button id="saveBtn">📌 도감에 추가</button>
   </div>
@@ -178,10 +186,11 @@ function toKorean(className) {
   return className.split(',')[0];
 }
 
-let model, removeBg, db, pendingBlob;
+let model, removeBg, db, pendingBlob, originalBlob, stickerBlob, usingOriginal;
 const status = document.getElementById('status');
 const preview = document.getElementById('preview');
 const result = document.getElementById('result');
+const toggleOriginal = document.getElementById('toggleOriginal');
 const book = document.getElementById('book');
 const countEl = document.getElementById('count');
 const confirmArea = document.getElementById('confirmArea');
@@ -282,7 +291,13 @@ async function addStickerBorder(blob, steps = 32) {
 document.getElementById('fileInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file || !model) return;
+  originalBlob = file;
+  stickerBlob = null;
+  usingOriginal = false;
   pendingBlob = file;
+  toggleOriginal.hidden = true;
+  toggleOriginal.classList.remove('active');
+  toggleOriginal.textContent = '🖼️ 원본 사진으로 저장';
   const url = URL.createObjectURL(file);
   preview.src = url;
   preview.style.display = 'block';
@@ -307,11 +322,21 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
     status.textContent = '✂️ 배경 제거 중...';
     const cutoutBlob = await cutout(file);
     if (cutoutBlob) {
+      stickerBlob = cutoutBlob;
       pendingBlob = cutoutBlob;
       preview.src = URL.createObjectURL(cutoutBlob);
+      toggleOriginal.hidden = false;
     }
     status.textContent = '✨ 준비 완료! 사진을 찍어보세요';
   };
+});
+
+toggleOriginal.addEventListener('click', () => {
+  usingOriginal = !usingOriginal;
+  pendingBlob = usingOriginal ? originalBlob : stickerBlob;
+  preview.src = URL.createObjectURL(pendingBlob);
+  toggleOriginal.textContent = usingOriginal ? '✨ 스티커로 저장' : '🖼️ 원본 사진으로 저장';
+  toggleOriginal.classList.toggle('active', usingOriginal);
 });
 
 altChips.addEventListener('click', (e) => {
