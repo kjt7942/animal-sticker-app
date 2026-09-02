@@ -110,16 +110,16 @@
     padding: 0 16px; font-family: 'Gaegu', sans-serif; font-size: 14px; cursor: pointer;
   }
   .chip.picked { background: #ffd7e6; color: #d1447a; }
-  .name-row { display: flex; gap: 6px; align-items: stretch; justify-content: center; }
   #nameInput {
     font-family: 'Jua', sans-serif; font-size: 16px; text-align: center; color: #6a4c93;
-    border: 2px solid #ffd6e4; border-radius: 999px; padding: 10px 12px; flex: 1; min-width: 0;
+    border: 2px solid #ffd6e4; border-radius: 999px; padding: 10px 14px; width: 100%;
     min-height: 46px; background: #fff;
   }
   #pickerBtn {
-    flex: 0 0 auto; min-height: 46px; padding: 0 12px; border: none; border-radius: 999px;
-    background: #eef3ff; color: #5b74c9; font-family: 'Gaegu', sans-serif;
-    font-size: 13px; line-height: 1.1; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    margin: 8px auto 0; min-height: 40px; padding: 0 18px; white-space: nowrap;
+    border: none; border-radius: 999px; background: #eef3ff; color: #5b74c9;
+    font-family: 'Gaegu', sans-serif; font-size: 14px; cursor: pointer;
   }
 
   .btn-pink, .btn-green, .btn-ghost {
@@ -303,10 +303,8 @@
     <div id="altChips"></div>
     <button type="button" class="btn-pink" id="convertBtn" hidden>🎨 스티커로 변환</button>
     <button type="button" id="toggleOriginal" hidden>🖼️ 원본 사진으로 저장</button>
-    <div class="name-row">
-      <input id="nameInput" type="text" placeholder="이름 확인/수정">
-      <button type="button" id="pickerBtn">🔤 직접<br>고르기</button>
-    </div>
+    <input id="nameInput" type="text" placeholder="이름 확인/수정">
+    <button type="button" id="pickerBtn">🔍 목록에서 직접 고르기</button>
     <button type="button" class="btn-green" id="saveBtn">📌 도감에 추가</button>
   </div>
 
