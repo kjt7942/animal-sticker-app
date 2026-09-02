@@ -20,6 +20,7 @@ export const KO_LABELS = {
   'monarch':'나비','cabbage butterfly':'나비','sulphur butterfly':'나비','admiral':'나비','ringlet':'나비','lycaenid':'나비',
   'ant':'개미','bee':'벌','grasshopper':'메뚜기','cricket':'귀뚜라미','cockroach':'바퀴벌레','mantis':'사마귀','dragonfly':'잠자리',
   'ladybug':'무당벌레','rhinoceros beetle':'장수풍뎅이','dung beetle':'쇠똥구리',
+  'long-horned beetle':'하늘소','ground beetle':'딱정벌레','leaf beetle':'잎벌레','tiger beetle':'길앞잡이','weevil':'바구미',
   'scorpion':'전갈','tarantula':'타란튤라','wolf spider':'거미','garden spider':'거미','black widow':'거미','tick':'진드기','centipede':'지네',
   'snail':'달팽이','slug':'민달팽이','jellyfish':'해파리','starfish':'불가사리','sea urchin':'성게',
   'bullfrog':'개구리','tree frog':'개구리','loggerhead':'거북','leatherback turtle':'거북','box turtle':'거북','terrapin':'거북','mud turtle':'거북',
@@ -63,6 +64,11 @@ export const SPECIES = [
   { id:'turtle',    name:'거북',     emoji:'🐢', rarity:2, description:'느리지만 절대 포기하지 않는다.', aliases:[] },
   { id:'goldfish',  name:'금붕어',   emoji:'🐠', rarity:2, description:'반짝이는 지느러미로 유유히 헤엄친다.', aliases:[] },
 
+  // 사슴벌레는 인식 모델(ImageNet)에 아예 없는 종이라 자동으로는 절대 안 잡힌다.
+  // 그래도 도감에는 있어야 해서 넣어두고, "직접 고르기"로 등록하게 한다.
+  { id:'stagbeetle',  name:'사슴벌레',   emoji:'🪲', rarity:3, description:'집게 같은 큰턱이 자랑거리인 숲의 장수.', aliases:[] },
+  { id:'rhinobeetle', name:'장수풍뎅이', emoji:'🪲', rarity:3, description:'머리에 뿔을 달고 다니는 곤충계 씨름왕.', aliases:[] },
+
   { id:'horse',     name:'말',       emoji:'🐴', rarity:3, description:'바람처럼 초원을 달린다.', aliases:[] },
   { id:'fox',       name:'여우',     emoji:'🦊', rarity:3, description:'꾀 많고 꼬리가 복슬복슬하다.', aliases:[] },
   { id:'penguin',   name:'펭귄',     emoji:'🐧', rarity:3, description:'뒤뚱뒤뚱 걷다가 물에선 로켓이 된다.', aliases:[] },
@@ -99,6 +105,15 @@ export function speciesById(id) {
   if (id.startsWith('wild:')) return wildSpecies(id.slice(5));
   return null;
 }
+
+// "직접 고르기" 목록: 도감 20여 종을 앞에 두고, 인식만 되는 나머지 이름을 가나다순으로 잇는다.
+export const PICKABLE_NAMES = (() => {
+  const dex = SPECIES.map(s => s.name);
+  const rest = [...new Set(Object.values(KO_LABELS))]
+    .filter(n => !BY_NAME.has(n))
+    .sort((a, b) => a.localeCompare(b, 'ko'));
+  return [...dex, ...rest];
+})();
 
 export const RARITY_LABEL = { 1:'일반', 2:'희귀', 3:'매우 희귀', 4:'특별', 5:'전설' };
 

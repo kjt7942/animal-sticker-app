@@ -1,7 +1,7 @@
 // 화면 조립 + 흐름 제어. 데이터는 animals.js / storage.js, 이미지는 sticker.js 담당.
 
-import { SPECIES, DEX_TOTAL, toKorean, speciesForName, stars, RARITY_LABEL } from './animals.js';
-import { openDb, getAllSightings, addSighting, clearAll, buildDex, getDaily, markDailyDone, formatDate } from './storage.js';
+import { SPECIES, DEX_TOTAL, PICKABLE_NAMES, toKorean, speciesForName, stars, RARITY_LABEL } from './animals.js';
+import { openDb, getAllSightings, addSighting, deleteSighting, setRepSighting, clearAll, buildDex, getDaily, markDailyDone, formatDate } from './storage.js';
 import { downscale, cutout, drawSticker, savePng, DECORATIONS } from './sticker.js';
 
 const $ = (id) => document.getElementById(id);
@@ -9,7 +9,7 @@ const el = {
   status: $('status'), progressWrap: $('progressWrap'), progressBar: $('progressBar'),
   fileInput: $('fileInput'), pickInput: $('pickInput'), pickBtn: $('pickBtn'),
   preview: $('preview'), result: $('result'), confirmArea: $('confirmArea'), notFound: $('notFound'),
-  altChips: $('altChips'), nameInput: $('nameInput'),
+  altChips: $('altChips'), nameInput: $('nameInput'), pickerBtn: $('pickerBtn'),
   convertBtn: $('convertBtn'), toggleOriginal: $('toggleOriginal'), saveBtn: $('saveBtn'),
   today: $('todayCard'), count: $('count'), collectBar: $('collectBar'),
   book: $('book'), settingsBtn: $('settingsBtn'),
@@ -78,7 +78,9 @@ async function refresh() {
 
 function resetCapture() {
   state.stickerBlob = null;
+  state.pendingBlob = null; // 분석이 실패했을 때 앞 사진이 저장되는 일이 없도록
   state.usingOriginal = false;
+  el.nameInput.value = '';
   el.result.innerHTML = '';
   el.confirmArea.hidden = true;
   el.notFound.hidden = true;
@@ -114,8 +116,14 @@ async function handleFile(file) {
   setStatus('동물 찾는 중...');
 
   try {
-    await el.preview.decode();
-    const predictions = await state.model.classify(el.preview);
+    // 화면의 <img> 대신 캔버스로 넘긴다. img.decode() 는 브라우저에 따라
+    // 이미 그려진 이미지에도 EncodingError 를 내는 경우가 있다.
+    const bmp = await createImageBitmap(state.originalBlob);
+    const frame = document.createElement('canvas');
+    frame.width = bmp.width; frame.height = bmp.height;
+    frame.getContext('2d').drawImage(bmp, 0, 0);
+    bmp.close();
+    const predictions = await state.model.classify(frame);
     setStatus('거의 다 됐어요...');
     showPrediction(predictions);
   } catch (e) {
@@ -172,7 +180,7 @@ function showNotFound(title, hint) {
 
 async function saveToDex() {
   const name = el.nameInput.value.trim();
-  if (!name || !state.pendingBlob) return;
+  if (!name || !state.pendingBlob || el.confirmArea.hidden) return;
 
   const species = speciesForName(name);
   const isNew = !state.dex.has(species.id);
@@ -223,9 +231,11 @@ function renderDex() {
     </button>`;
   };
 
-  const parts = SPECIES.map(s => cardHtml(s, state.dex.get(s.id)));
-  for (const entry of state.dex.values()) {
-    if (entry.species.wild) parts.push(cardHtml(entry.species, entry));
+  // 발견한 카드를 먼저(최근 발견 순), 아직 못 만난 칸을 뒤에 둔다
+  const found = [...state.dex.values()].sort((a, b) => b.lastAt - a.lastAt);
+  const parts = found.map(e => cardHtml(e.species, e));
+  for (const s of SPECIES) {
+    if (!state.dex.has(s.id)) parts.push(cardHtml(s, null));
   }
   el.book.innerHTML = parts.join('');
 }
@@ -289,10 +299,45 @@ function showDetail(speciesId) {
         <div><b>${entry.count}회</b><span>발견 횟수</span></div>
         <div><b>${formatDate(entry.firstAt)}</b><span>첫 발견</span></div>
       </div>
+      ${shotsHtml(entry)}
       <button type="button" class="btn-pink" data-act="big" data-species="${s.id}">🔍 스티커 크게 보기</button>
       <button type="button" class="btn-green" data-act="retake">📸 다시 사진 찍기</button>
       <button type="button" class="btn-ghost" data-act="close">닫기</button>
     </div>`);
+}
+
+// 같은 종으로 찍은 사진을 전부 보여준다. 누르면 대표 사진, ✕ 는 삭제.
+function shotsHtml(entry) {
+  const shots = entry.shots.slice().reverse().map(shot => `
+    <div class="shot${shot.id === entry.repId ? ' rep' : ''}">
+      <img src="${dexUrl(shot.blob)}" alt="${formatDate(shot.ts)} 사진"
+           data-rep="${shot.id}" data-species="${entry.species.id}">
+      <button type="button" class="shot-del" data-del="${shot.id}" data-species="${entry.species.id}"
+              aria-label="이 사진 삭제">✕</button>
+    </div>`).join('');
+  return `<div class="shots">${shots}</div>
+    <p class="shots-hint">${entry.count > 1 ? '사진을 누르면 도감 대표 사진이 돼요' : '찍은 사진 1장'}</p>`;
+}
+
+function showPicker() {
+  openModal(`
+    <div class="picker">
+      <h3 class="disc-name">🔤 직접 고르기</h3>
+      <p class="disc-msg">인식이 빗나갔을 때 여기서 골라 주세요.</p>
+      <input id="pickSearch" type="text" placeholder="이름으로 찾기">
+      <div id="pickList">${pickListHtml('')}</div>
+      <button type="button" class="btn-ghost" data-act="close">닫기</button>
+    </div>`);
+  $('pickSearch').addEventListener('input', (e) => {
+    $('pickList').innerHTML = pickListHtml(e.target.value.trim());
+  });
+}
+
+function pickListHtml(query) {
+  const names = query ? PICKABLE_NAMES.filter(n => n.includes(query)) : PICKABLE_NAMES;
+  if (!names.length) return `<p class="disc-msg">그런 이름은 아직 없어요. 직접 적어도 돼요!</p>`;
+  return names.slice(0, 60)
+    .map(n => `<button type="button" class="chip" data-pick="${n}">${n}</button>`).join('');
 }
 
 function showStickerView(speciesId) {
@@ -346,6 +391,8 @@ function showSettings() {
     <div class="settings">
       <h3 class="disc-name">⚙️ 설정</h3>
       <p class="disc-msg">도감은 이 기기에만 저장돼요.</p>
+      <button type="button" class="btn-ghost" data-act="clearcache">📦 인식 모델 캐시 비우기</button>
+      <p class="shots-hint">저장 공간을 되찾지만, 다음 스티커 만들 때 모델을 다시 받아요.</p>
       <button type="button" class="btn-ghost danger" data-act="clear">🗑️ 도감 전체 비우기</button>
       <button type="button" class="btn-ghost" data-act="close">닫기</button>
     </div>`);
@@ -445,8 +492,37 @@ function bindEvents() {
 
   el.settingsBtn.addEventListener('click', showSettings);
 
+  el.pickerBtn.addEventListener('click', showPicker);
+
   el.modal.addEventListener('click', async (e) => {
     if (e.target === el.modal) { closeModal(); return; }
+
+    const pick = e.target.closest('[data-pick]');
+    if (pick) {
+      el.nameInput.value = pick.dataset.pick;
+      el.altChips.querySelectorAll('.chip').forEach(c => c.classList.remove('picked'));
+      closeModal();
+      return;
+    }
+
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      if (!confirm('이 사진을 지울까요?')) return;
+      const speciesId = del.dataset.species;
+      await deleteSighting(Number(del.dataset.del));
+      await refresh();
+      if (state.dex.has(speciesId)) showDetail(speciesId); else closeModal();
+      return;
+    }
+
+    const rep = e.target.closest('[data-rep]');
+    if (rep) {
+      setRepSighting(rep.dataset.species, Number(rep.dataset.rep));
+      await refresh();
+      showDetail(rep.dataset.species);
+      return;
+    }
+
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
     const { act, species } = btn.dataset;
@@ -456,6 +532,16 @@ function bindEvents() {
     else if (act === 'download') downloadSticker(species, false);
     else if (act === 'download-deco') downloadSticker(species, true);
     else if (act === 'retake') { closeModal(); el.fileInput.click(); }
+    else if (act === 'clearcache') {
+      if (!confirm('내려받은 인식 모델을 지울까요?')) return;
+      try {
+        await caches.delete('animal-sticker-cdn-v1');
+        setStatus('모델 캐시를 비웠어요.');
+      } catch (e) {
+        console.error('모델 캐시 삭제 실패:', e);
+      }
+      closeModal();
+    }
     else if (act === 'clear') {
       if (!confirm('도감을 전부 비울까요? 되돌릴 수 없어요.')) return;
       await clearAll();
